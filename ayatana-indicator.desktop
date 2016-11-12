@@ -1,0 +1,8 @@
+[Desktop Entry]
+Version=0.1
+Name=Ayatana Indicator
+Comment=Indicator for displaying active applications and their windows
+Exec=ayatana-indicator
+Type=Application
+Icon=preferences-system-windows
+Terminal=false
