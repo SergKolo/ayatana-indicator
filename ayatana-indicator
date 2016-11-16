@@ -179,17 +179,20 @@ class AyatanaIndicator(object):
         ]
         self.add_menu_item(*item)
 
+
+        stats_submenu = self.add_submenu(self.app_menu,"statistics",None) 
+
         current_vp = self.get_current_viewport()
         all_vps = self.enumerate_viewports()
         current_vp_num = all_vps[current_vp]
         num_workspaces = len(all_vps)
-        label = 'STATS:\n' + '-'*40 + '\nWindows:' + str(window_counter) \
+        label = 'Windows:' + str(window_counter) \
                 + '\tApps:' + str(app_counter) + '\nViewports:' + str(num_workspaces) \
                 + '\tCurrent Viewport:' + str(current_vp_num) + ","\
                 + str(current_vp) + '\nMonitor Count:' + str(self.get_monitor_count())
-        self.add_menu_item(self.app_menu,gtk.MenuItem,None,label,None,[None])
+        self.add_menu_item(stats_submenu,gtk.MenuItem,None,label,None,[None])
         last = None
-        for child in self.app_menu.get_children(): last = child
+        for child in stats_submenu.get_children(): last = child
         last.set_sensitive(False)
         #last.set_can_focus(False)
         self.add_menu_item(self.app_menu,gtk.ImageMenuItem,'exit','quit',self.quit,[None])
