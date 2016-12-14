@@ -65,7 +65,6 @@ class AyatanaIndicator(object):
                               for i in self.cached_stack
         ]
         self.theme = gtk.IconTheme.get_default()
-        print(self.theme)
         self.app.set_status(appindicator.IndicatorStatus.ACTIVE)
         self.make_menu()
         self.update()
@@ -139,8 +138,6 @@ class AyatanaIndicator(object):
                 name = '<' + name + '>'
             desktop_file = self.get_desktop_file(app_path)
             icon = self.get_app_icon(desktop_file)
-            #if 'gksu-root-terminal' in icon: #icon = '/usr/share/pixmaps/' + icon + '.png'
-                #print(self.theme.lookup_icon(icon, 48, 0).get_filename())
             xids = self.get_app_xids(app_path)
             num_windows = str(len(xids))
             name = name + "\n" + num_windows + " windows open"
@@ -156,7 +153,7 @@ class AyatanaIndicator(object):
                 if self.is_active(xid):
                    status = 'True'
 
-                label_items = ['Title: ' + title + '\n',
+                label_items = [title + '\n',
                                'XID:\t' + str(xid) ,
                                'PID:\t' + str(pid),
                                'Viewport:\t' + str(viewport) ,
@@ -198,12 +195,17 @@ class AyatanaIndicator(object):
         for child in stats_submenu.get_children(): last = child
         last.set_sensitive(False)
         #last.set_can_focus(False)
+
+        self.add_menu_item(self.app_menu,gtk.ImageMenuItem,'about','about',self.show_about_dlg,[None])
         self.add_menu_item(self.app_menu,gtk.ImageMenuItem,'exit','quit',self.quit,[None])
         self.app.set_menu(self.app_menu)
 
     def update(self,*args):
+       
         current_stack = self.get_window_stack()
-        current_titles =  [self.get_window_title(i[0]) for i in current_stack]
+        current_titles = [self.get_window_title(i[0]) 
+                          for i in current_stack
+        ]
 
         if (current_stack != self.cached_stack or
             current_titles != self.cached_titles):
@@ -298,10 +300,12 @@ class AyatanaIndicator(object):
                  None
         ]
         stack = self.get_dbus(*call)
+        clean_stack = []
         for index,item in enumerate(stack):
-                if 'compiz' in item:
-                    stack.pop(index)
-        return stack 
+                if 'compiz' in item[1]:
+                    continue
+                clean_stack.append(item)
+        return clean_stack 
 
     def raise_xid(self,*args):
         window_vp_num = self.get_viewport_for_xid(args[-1])
@@ -354,7 +358,6 @@ class AyatanaIndicator(object):
         try:
             app_info = Gio.DesktopAppInfo.new_from_filename(args[-1])
             icon = app_info.get_icon()
-            print(type(icon))
             if type(icon) == Gio.ThemedIcon:
                 themed_name = icon.get_names()[0]
                 theme = gtk.IconTheme.get_default()
@@ -366,7 +369,7 @@ class AyatanaIndicator(object):
             return None
         else:
             urllib_decoded = urllib.parse.unquote(name).replace('file://','')
-            print(urllib_decoded)
+            #print(urllib_decoded)
             return urllib_decoded
 
     def get_desktop_file(self,*args):
@@ -406,10 +409,13 @@ class AyatanaIndicator(object):
             bus = dbus.SystemBus()
         proxy = bus.get_object(obj, path)
         method = proxy.get_dbus_method(method, interface)
-        if arg:
-            return method(arg)
-        else:
-            return method()
+        try:
+            if arg:
+                return method(arg)
+            else:
+                return method()
+        except dbus.exceptions.DBusException:
+            return None
 
     def get_dbus_property(self, bus_type, obj, path, iface, prop):
         """ utility:reads properties defined on specific dbus interface"""
@@ -422,6 +428,19 @@ class AyatanaIndicator(object):
         props_iface = dbus.Interface(proxy, aux)
         props = props_iface.Get(iface, prop)
         return props
+
+    def show_about_dlg(self,*args):
+        dlg = gtk.AboutDialog()
+        dlg.set_program_name('Ayatana Indicator')
+        #dlg.set_version()
+        dlg.set_logo(None)
+        #dlg.set_logo_icon_name('preferences-system-windows')
+        dlg.set_authors(['Sergiy Kolodyazhnyy <1047481448@qq.com>'])
+        #dlg.set_wrap_license(True)
+        dlg.set_copyright('Copyright (c) 2011-2016 Sergiy Kolodyazhnyy')
+        dlg.set_title("")
+        dlg.run()
+        dlg.destroy()
 
     def quit(self,*args):
         gtk.main_quit()

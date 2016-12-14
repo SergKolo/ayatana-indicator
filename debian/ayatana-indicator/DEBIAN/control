@@ -2,7 +2,7 @@ Package: ayatana-indicator
 Version: 0.1-1
 Architecture: all
 Maintainer: Sergiy Kolodyazhnyy <1047481448@qq.com>
-Installed-Size: 29
+Installed-Size: 30
 Depends: python3-gi, gir1.2-appindicator3-0.1, wmctrl
 Section: python
 Priority: extra
