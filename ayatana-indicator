@@ -200,7 +200,6 @@ class AyatanaIndicator(object):
         last.set_sensitive(False)
         #last.set_can_focus(False)
 
-        self.add_menu_item(self.app_menu,gtk.ImageMenuItem,'about','about',self.show_about_dlg,[None])
         self.add_menu_item(self.app_menu,gtk.ImageMenuItem,'exit','quit',self.quit,[None])
         self.app.set_menu(self.app_menu)
 
@@ -447,18 +446,6 @@ class AyatanaIndicator(object):
         props = props_iface.Get(iface, prop)
         return props
 
-    def show_about_dlg(self,*args):
-        dlg = gtk.AboutDialog()
-        dlg.set_program_name('Ayatana Indicator')
-        #dlg.set_version()
-        dlg.set_logo(None)
-        #dlg.set_logo_icon_name('preferences-system-windows')
-        dlg.set_authors(['Sergiy Kolodyazhnyy <1047481448@qq.com>'])
-        #dlg.set_wrap_license(True)
-        dlg.set_copyright('Copyright (c) 2011-2016 Sergiy Kolodyazhnyy')
-        dlg.set_title("")
-        dlg.run()
-        dlg.destroy()
 
     def quit(self,*args):
         gtk.main_quit()
