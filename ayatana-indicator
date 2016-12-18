@@ -99,6 +99,8 @@ class AyatanaIndicator(object):
         menu_obj.append(menu_item)
         menu_item.show()
 
+    
+
     def add_submenu(self,top_menu,label,icon):
         
         if icon:
@@ -143,6 +145,7 @@ class AyatanaIndicator(object):
             name = name + "\n" + num_windows + " windows open"
             app_submenu = self.add_submenu(self.app_menu,name,icon) 
             for xid in xids:
+                geometry = self.get_dimensions(xid)
                 window_counter = window_counter + 1
                 pid = self.get_window_pid(xid)
                 viewport = self.get_viewport_for_xid(xid)
@@ -158,6 +161,7 @@ class AyatanaIndicator(object):
                                'PID:\t' + str(pid),
                                'Viewport:\t' + str(viewport) ,
                                'Monitor:\t' + str(monitor),
+                               'Geometry:\t' + str(geometry),
                                'Active:\t' + status
                 ]
                 label = "\n".join(label_items)
@@ -215,6 +219,20 @@ class AyatanaIndicator(object):
 
         glib.timeout_add_seconds(3,self.callback)
 
+    def get_dimensions(self,xid):
+        dimensions = None
+        wininfo = self.run_cmd(['xwininfo','-id',str(xid)])
+        if wininfo:
+            lines = wininfo.decode().strip().split('\n')
+        for line in lines:
+            l = line.lstrip()
+            if l.startswith('Width:'):
+               dimensions = l.split(':')[1] + 'x'
+            if l.startswith('Height:'):
+               dimensions = dimensions + l.split(':')[1]
+        return dimensions
+               
+      
     def callback(self,*args):
         self.update()
 
