@@ -321,7 +321,11 @@ class AyatanaIndicator(object):
         for index,item in enumerate(stack):
                 if 'compiz' in item[1]:
                     continue
-                clean_stack.append(item)
+                clean_stack.append((item[0],self.get_dimensions(item[0])))
+                #print(item[0])
+ 
+       
+        
         return clean_stack 
 
     def raise_xid(self,*args):
