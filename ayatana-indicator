@@ -149,7 +149,7 @@ class AyatanaIndicator(object):
                 window_counter = window_counter + 1
                 pid = self.get_window_pid(xid)
                 viewport = self.get_viewport_for_xid(xid)
-                title = self.get_window_title(xid)[:20]
+                title = str(self.get_window_title(xid))[:20]
                 title = title + ' '*(20 - len(title))
                 monitor = self.get_monitor(xid)
                 status = 'False'
