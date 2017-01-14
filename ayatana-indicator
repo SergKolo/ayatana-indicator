@@ -47,6 +47,8 @@ import dbus
 #import json
 import os
 
+# TODO: add resizing option for active window
+
 class AyatanaIndicator(object):
 
     def __init__(self):
@@ -223,12 +225,12 @@ class AyatanaIndicator(object):
         wininfo = self.run_cmd(['xwininfo','-id',str(xid)])
         if wininfo:
             lines = wininfo.decode().strip().split('\n')
-        for line in lines:
-            l = line.lstrip()
-            if l.startswith('Width:'):
-               dimensions = l.split(':')[1] + 'x'
-            if l.startswith('Height:'):
-               dimensions = dimensions + l.split(':')[1]
+            for line in lines:
+                l = line.lstrip()
+                if l.startswith('Width:'):
+                   dimensions = l.split(':')[1] + 'x'
+                if l.startswith('Height:'):
+                   dimensions = dimensions + l.split(':')[1]
         return dimensions
                
       
