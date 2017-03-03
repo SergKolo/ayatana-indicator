@@ -32,22 +32,22 @@
 # SOFTWARE.
 import gi
 gi.require_version('AppIndicator3', '0.1')
-#gi.require_version('Notify', '0.7')
-from gi.repository import GLib as glib
+from gi.repository import GLib
 from gi.repository import AppIndicator3 as appindicator
-from gi.repository import Gtk as gtk
+from gi.repository import Gtk as Gtk
 from gi.repository import Gio
-#from gi.repository import Notify
 from gi.repository import Gdk
 from collections import OrderedDict
-import time
 import urllib.parse
 import subprocess
+import signal
+import time
 import dbus
-#import json
+# import json
 import os
 
 # TODO: add resizing option for active window
+
 
 class AyatanaIndicator(object):
 
@@ -57,16 +57,17 @@ class AyatanaIndicator(object):
             appindicator.IndicatorCategory.HARDWARE
         )
         self.bus = "session"
+        self.seen_apps = set()
         self.service = "org.ayatana.bamf"
-        self.paths = [ "/org/ayatana/bamf/matcher",
-                       "/org/ayatana/bamf/control"
-        ]
+        self.paths = ["/org/ayatana/bamf/matcher",
+                      "/org/ayatana/bamf/control"
+                      ]
 
         self.cached_stack = self.get_window_stack()
-        self.cached_titles = [self.get_window_title(i[0]) 
+        self.cached_titles = [self.get_window_title(i[0])
                               for i in self.cached_stack
-        ]
-        self.theme = gtk.IconTheme.get_default()
+                              ]
+        self.theme = Gtk.IconTheme.get_default()
         self.app.set_status(appindicator.IndicatorStatus.ACTIVE)
         self.make_menu()
         self.update()
@@ -75,60 +76,58 @@ class AyatanaIndicator(object):
         """ dynamic function that can add menu items depending on
             the item type and other arguments"""
         menu_item, icon = None, None
-        if item_type is gtk.ImageMenuItem and label:
-            menu_item = gtk.ImageMenuItem.new_with_label(label)
+        if item_type is Gtk.ImageMenuItem and label:
+            menu_item = Gtk.ImageMenuItem.new_with_label(label)
             menu_item.set_always_show_image(True)
             if '/' in image:
-                icon = gtk.Image.new_from_file(image)
+                icon = Gtk.Image.new_from_file(image)
             else:
-                icon = gtk.Image.new_from_icon_name(image, 16)
+                icon = Gtk.Image.new_from_icon_name(image, 16)
             menu_item.set_image(icon)
-        elif item_type is gtk.ImageMenuItem and not label:
-            menu_item = gtk.ImageMenuItem()
+        elif item_type is Gtk.ImageMenuItem and not label:
+            menu_item = Gtk.ImageMenuItem()
             menu_item.set_always_show_image(True)
             if '/' in image:
-                icon = gtk.Image.new_from_file(image)
+                icon = Gtk.Image.new_from_file(image)
             else:
-                icon = gtk.Image.new_from_icon_name(image, 16)
+                icon = Gtk.Image.new_from_icon_name(image, 16)
             menu_item.set_image(icon)
-        elif item_type is gtk.MenuItem:
-            menu_item = gtk.MenuItem(label)
-        elif item_type is gtk.SeparatorMenuItem:
-            menu_item = gtk.SeparatorMenuItem()
+        elif item_type is Gtk.MenuItem:
+            menu_item = Gtk.MenuItem(label)
+        elif item_type is Gtk.SeparatorMenuItem:
+            menu_item = Gtk.SeparatorMenuItem()
         if action:
             menu_item.connect('activate', action, *args)
 
         menu_obj.append(menu_item)
         menu_item.show()
 
-    
+    def add_submenu(self, top_menu, label, icon):
 
-    def add_submenu(self,top_menu,label,icon):
-        
         if icon:
-            menuitem = gtk.ImageMenuItem() 
+            menuitem = Gtk.ImageMenuItem()
             menuitem.set_always_show_image(True)
             if '/' in icon:
-                image = gtk.Image.new_from_file(icon)
+                image = Gtk.Image.new_from_file(icon)
             else:
-                image = gtk.Image.new_from_icon_name(icon,16)
+                image = Gtk.Image.new_from_icon_name(icon, 16)
             menuitem.set_image(image)
             menuitem.set_label(label)
         else:
-            menuitem = gtk.MenuItem(label)
-        submenu = gtk.Menu()
+            menuitem = Gtk.MenuItem(label)
+        submenu = Gtk.Menu()
         menuitem.set_submenu(submenu)
         top_menu.append(menuitem)
         menuitem.show()
         return submenu
-    
+
     def make_menu(self):
         if hasattr(self, 'app_menu'):
             for item in self.app_menu.get_children():
-                #if item.get_label() != 'quit':
-                    self.app_menu.remove(item)
+                # if item.get_label() != 'quit':
+                self.app_menu.remove(item)
         else:
-            self.app_menu = gtk.Menu()
+            self.app_menu = Gtk.Menu()
 
         running_list = self.get_running_apps()
         active = str(self.get_active_app())
@@ -136,293 +135,315 @@ class AyatanaIndicator(object):
         window_counter = 0
         for app_path in running_list:
             name = self.get_app_name(app_path)
-            if 'Compiz' == name: continue
+            if 'Compiz' == name:
+                continue
             app_counter = app_counter + 1
-            if str(app_path) == active:
-                name = '<' + name + '>'
             desktop_file = self.get_desktop_file(app_path)
             icon = self.get_app_icon(desktop_file)
+            self.seen_apps.add((name,desktop_file,icon))
+            if str(app_path) == active:
+                name = '>>>  ' + name
             xids = self.get_app_xids(app_path)
             num_windows = str(len(xids))
             name = name + "\n" + num_windows + " windows open"
-            app_submenu = self.add_submenu(self.app_menu,name,icon) 
+            app_submenu = self.add_submenu(self.app_menu, name, icon)
             for xid in xids:
                 geometry = self.get_dimensions(xid)
                 window_counter = window_counter + 1
                 pid = self.get_window_pid(xid)
                 viewport = self.get_viewport_for_xid(xid)
                 title = str(self.get_window_title(xid))[:20]
-                title = title + ' '*(20 - len(title))
+                title = title + ' ' * (20 - len(title))
                 monitor = self.get_monitor(xid)
+                if not all([geometry, pid, viewport, title]):
+                    continue
                 status = 'False'
                 if self.is_active(xid):
-                   status = 'True'
+                    status = 'True'
 
                 label_items = [title + '\n',
-                               'XID:\t' + str(xid) ,
+                               'XID:\t' + str(xid),
                                'PID:\t' + str(pid),
-                               'Viewport:\t' + str(viewport) ,
+                               'Viewport:\t' + str(viewport),
                                'Monitor:\t' + str(monitor),
                                'Geometry:\t' + str(geometry),
                                'Active:\t' + status
-                ]
+                               ]
                 label = "\n".join(label_items)
 
-                item = [app_submenu,gtk.MenuItem,
-                        None,label,
-                        self.raise_xid,[xid]
-                ]
+                item = [app_submenu, Gtk.MenuItem,
+                        None, label,
+                        self.raise_xid, [xid]
+                        ]
                 self.add_menu_item(*item)
-                item = [app_submenu,gtk.SeparatorMenuItem,
-                        None,None,
-                        None,[None]
-                ]
+                item = [app_submenu, Gtk.SeparatorMenuItem,
+                        None, None,
+                        None, [None]
+                        ]
                 self.add_menu_item(*item)
 
-        item = [self.app_menu,gtk.SeparatorMenuItem,
-                None,None,
-                None,[None]
-        ]
+        item = [self.app_menu, Gtk.SeparatorMenuItem,
+                None, None,
+                None, [None]
+                ]
         self.add_menu_item(*item)
 
 
-        stats_submenu = self.add_submenu(self.app_menu,"statistics",None) 
+        recent_submenu = self.add_submenu(self.app_menu, "recent apps", None)
+        for appname,deskt_file,icon in self.seen_apps:
+             item = [recent_submenu,Gtk.ImageMenuItem,
+                     icon, appname,
+                     self.open_desktop_file,[deskt_file]
+             ]
+             self.add_menu_item(*item)
+
+        stats_submenu = self.add_submenu(self.app_menu, "statistics", None)
 
         current_vp = self.get_current_viewport()
         all_vps = self.enumerate_viewports()
         current_vp_num = all_vps[current_vp]
         num_workspaces = len(all_vps)
         label = 'Windows:' + str(window_counter) \
-                + '\tApps:' + str(app_counter) + '\nViewports:' + str(num_workspaces) \
+                + '\tApps:' + str(app_counter) \
+                + '\nViewports:' + str(num_workspaces) \
                 + '\tCurrent Viewport:' + str(current_vp_num) + ","\
-                + str(current_vp) + '\nMonitor Count:' + str(self.get_monitor_count())
-        self.add_menu_item(stats_submenu,gtk.MenuItem,None,label,None,[None])
+                + str(current_vp) + '\nMonitor Count:' + \
+            str(self.get_monitor_count())
+        self.add_menu_item(
+            stats_submenu, Gtk.MenuItem, None, label, None, [None])
         last = None
-        for child in stats_submenu.get_children(): last = child
+        for child in stats_submenu.get_children():
+            last = child
         last.set_sensitive(False)
-        #last.set_can_focus(False)
+        # last.set_can_focus(False)
 
-        self.add_menu_item(self.app_menu,gtk.ImageMenuItem,'exit','quit',self.quit,[None])
+        self.add_menu_item(
+            self.app_menu, Gtk.ImageMenuItem, 'exit', 'quit', self.quit, [None])
         self.app.set_menu(self.app_menu)
 
-    def update(self,*args):
-       
+    def update(self, *args):
+
         current_stack = self.get_window_stack()
-        current_titles = [self.get_window_title(i[0]) 
+        current_titles = [self.get_window_title(i[0])
                           for i in current_stack
-        ]
+                          ]
 
         if (current_stack != self.cached_stack or
-            current_titles != self.cached_titles):
+                current_titles != self.cached_titles):
             self.make_menu()
             self.cached_stack = current_stack
             self.cached_titles = current_titles
 
-        glib.timeout_add_seconds(3,self.callback)
+        GLib.timeout_add_seconds(3, self.callback)
 
-    def get_dimensions(self,xid):
+    def open_desktop_file(self,*args):
+        desk_file = Gio.DesktopAppInfo.new_from_filename(args[-1])
+        return desk_file.launch_uris()
+
+    def get_dimensions(self, xid):
         dimensions = None
-        wininfo = self.run_cmd(['xwininfo','-id',str(xid)])
+        wininfo = self.run_cmd(['xwininfo', '-id', str(xid)])
         if wininfo:
             lines = wininfo.decode().strip().split('\n')
             for line in lines:
                 l = line.lstrip()
                 if l.startswith('Width:'):
-                   dimensions = l.split(':')[1] + 'x'
+                    dimensions = l.split(':')[1] + 'x'
                 if l.startswith('Height:'):
-                   dimensions = dimensions + l.split(':')[1]
+                    dimensions = dimensions + l.split(':')[1]
         return dimensions
-               
-      
-    def callback(self,*args):
+
+    def callback(self, *args):
         self.update()
 
-    def get_monitor_count(self,*args):
+    def get_monitor_count(self, *args):
         sc = Gdk.Screen.get_default()
         return sc.get_n_monitors()
 
-    def gsettings_get(self,schema,path,key):
+    def gsettings_get(self, schema, path, key):
         """Get value of gsettings schema"""
         if path is None:
             gsettings = Gio.Settings.new(schema)
         else:
-            gsettings = Gio.Settings.new_with_path(schema,path)
+            gsettings = Gio.Settings.new_with_path(schema, path)
         return gsettings.get_value(key)
 
-    def get_viewport_tuple(self,num):
-        for key,val in self.enumerate_viewports().items():
-              if num == val: return key
-    
-    def enumerate_viewports(self,*args):
+    def get_viewport_tuple(self, num):
+        for key, val in self.enumerate_viewports().items():
+            if num == val:
+                return key
+
+    def enumerate_viewports(self, *args):
         """ generates enumerated dictionary of viewports and their
             indexes, counting left to right """
-        schema="org.compiz.core"
-        path="/org/compiz/profiles/unity/plugins/core/"
-        keys=['hsize','vsize']
+        schema = "org.compiz.core"
+        path = "/org/compiz/profiles/unity/plugins/core/"
+        keys = ['hsize', 'vsize']
         screen = Gdk.Screen.get_default()
-        screen_size=[screen.get_width(),screen.get_height()]
-        grid=[int(str(self.gsettings_get(schema,path,key))) for key in keys]
-        x_vals=[screen_size[0]*x for x in range(0,grid[0])]
-        y_vals=[screen_size[1]*x for x in range(0,grid[1])]
-        
-        viewports=[(x,y)  for y in y_vals for x in x_vals ]
+        screen_size = [screen.get_width(), screen.get_height()]
+        grid = [int(str(self.gsettings_get(schema, path, key)))
+                for key in keys]
+        x_vals = [screen_size[0] * x for x in range(0, grid[0])]
+        y_vals = [screen_size[1] * x for x in range(0, grid[1])]
+
+        viewports = [(x, y) for y in y_vals for x in x_vals]
         viewports_dict = OrderedDict()
-        for ix,vp in enumerate(viewports,1):
+        for ix, vp in enumerate(viewports, 1):
             viewports_dict[vp] = ix
         return viewports_dict
-    
-    def get_current_viewport(self,*args):
-        """returns tuple representing current viewport, 
+
+    def get_current_viewport(self, *args):
+        """returns tuple representing current viewport,
            in format (width,height)"""
-        vp_string = self.run_cmd(['xprop', '-root', 
-                             '-notype', '_NET_DESKTOP_VIEWPORT'])
-        vp_list=vp_string.decode().strip().split('=')[1].split(',')
-        return tuple( int(i)  for i in vp_list )
+        vp_string = self.run_cmd(['xprop', '-root',
+                                  '-notype', '_NET_DESKTOP_VIEWPORT'])
+        vp_list = vp_string.decode().strip().split('=')[1].split(',')
+        return tuple(int(i) for i in vp_list)
 
-    def enumerate_relative_viewports(self,*args):
-       """ computes Unity viewport positions relative
-           to current viewport
-       """
-       new_vp_dict = OrderedDict()
-       current_viewport = self.get_current_viewport()
-       for vp,num in self.enumerate_viewports().items():
-           relative_pos = (vp[0] - current_viewport[0],
-                           vp[1] - current_viewport[1])
-           new_vp_dict[relative_pos] = num
-       return new_vp_dict
+    def enumerate_relative_viewports(self, *args):
+        """ computes Unity viewport positions relative
+            to current viewport
+        """
+        new_vp_dict = OrderedDict()
+        current_viewport = self.get_current_viewport()
+        for vp, num in self.enumerate_viewports().items():
+            relative_pos = (vp[0] - current_viewport[0],
+                            vp[1] - current_viewport[1])
+            new_vp_dict[relative_pos] = num
+        return new_vp_dict
 
-    def get_viewport_for_xid(self,xid):
+    def get_viewport_for_xid(self, xid):
         sc = Gdk.Screen.get_default()
         win_obj = None
         for w in sc.get_window_stack():
             if w.get_xid() == xid:
-               win_obj = w
-               break
+                win_obj = w
+                break
+
+        if not win_obj:
+            return
         position = (win_obj.get_origin().x,
                     win_obj.get_origin().y)
         viewports = self.enumerate_viewports()
-        if self.get_current_viewport() != (0,0):
+        if self.get_current_viewport() != (0, 0):
             viewports = self.enumerate_relative_viewports()
         last = None
         for vp in viewports.keys():
-            if (position[0]>= vp[0] and 
-                position[1]>= vp[1]):
+            if (position[0] >= vp[0] and
+                    position[1] >= vp[1]):
                 last = viewports[vp]
         return last
 
-    def get_window_stack(self,*args):
-        call = [ 'session',
-                 'com.canonical.Unity.WindowStack', 
-                 '/com/canonical/Unity/WindowStack', 
-                 'com.canonical.Unity.WindowStack',
-                 'GetWindowStack',
-                 None
-        ]
+    def get_window_stack(self, *args):
+        call = ['session',
+                'com.canonical.Unity.WindowStack',
+                '/com/canonical/Unity/WindowStack',
+                'com.canonical.Unity.WindowStack',
+                'GetWindowStack',
+                None
+                ]
         stack = self.get_dbus(*call)
         clean_stack = []
-        for index,item in enumerate(stack):
-                if 'compiz' in item[1]:
-                    continue
-                clean_stack.append((item[0],self.get_dimensions(item[0])))
-                #print(item[0])
- 
-       
-        
-        return clean_stack 
+        for index, item in enumerate(stack):
+            if 'compiz' in item[1]:
+                continue
+            clean_stack.append((item[0], self.get_dimensions(item[0])))
+            # print(item[0])
 
-    def raise_xid(self,*args):
+        return clean_stack
+
+    def raise_xid(self, *args):
         window_vp_num = self.get_viewport_for_xid(args[-1])
         window_vp = self.get_viewport_tuple(window_vp_num)
         current_vp = self.get_current_viewport()
         if current_vp != window_vp:
             vp_str = ",".join([str(i) for i in window_vp])
-            self.run_cmd(['wmctrl','-o',vp_str])
+            self.run_cmd(['wmctrl', '-o', vp_str])
         sc = Gdk.Screen.get_default()
         for window in sc.get_window_stack():
             if window.get_xid() == args[-1]:
-               window.focus(time.time())
-               window.process_all_updates()
-               self.make_menu()
+                window.focus(time.time())
+                window.process_all_updates()
+                self.make_menu()
 
-    def get_window_title(self,*args):
-        full_path = '/org/ayatana/bamf/window/'  + str(args[-1])
-        call = [self.bus,self.service,
-                full_path,'org.ayatana.bamf.view',
-                'Name',None
-        ]
-        return self.get_dbus(*call)
-
-    def get_window_pid(self,*args):
-        full_path = '/org/ayatana/bamf/window/'  + str(args[-1])
-        call = [self.bus,self.service,
-                full_path,'org.ayatana.bamf.window',
-                'GetPid',None
-        ]
-        return self.get_dbus(*call)
-
-
-    def is_active(self,*args):
-        full_path = '/org/ayatana/bamf/window/'  + str(args[-1])
-        call = [self.bus,self.service,
+    def get_window_title(self, *args):
+        full_path = '/org/ayatana/bamf/window/' + str(args[-1])
+        call = [self.bus, self.service,
                 full_path, 'org.ayatana.bamf.view',
-                'IsActive',None
-        ]
+                'Name', None
+                ]
         return self.get_dbus(*call)
 
-    def get_monitor(self,*args):
-        full_path = '/org/ayatana/bamf/window/'  + str(args[-1])
-        call = [self.bus,self.service,
+    def get_window_pid(self, *args):
+        full_path = '/org/ayatana/bamf/window/' + str(args[-1])
+        call = [self.bus, self.service,
                 full_path, 'org.ayatana.bamf.window',
-                'Monitor',None
-        ]
+                'GetPid', None
+                ]
+        return self.get_dbus(*call)
+
+    def is_active(self, *args):
+        full_path = '/org/ayatana/bamf/window/' + str(args[-1])
+        call = [self.bus, self.service,
+                full_path, 'org.ayatana.bamf.view',
+                'IsActive', None
+                ]
+        return self.get_dbus(*call)
+
+    def get_monitor(self, *args):
+        full_path = '/org/ayatana/bamf/window/' + str(args[-1])
+        call = [self.bus, self.service,
+                full_path, 'org.ayatana.bamf.window',
+                'Monitor', None
+                ]
         return str(self.get_dbus(*call))
 
-    def get_app_icon(self,*args):
+    def get_app_icon(self, *args):
         try:
             app_info = Gio.DesktopAppInfo.new_from_filename(args[-1])
             icon = app_info.get_icon()
             if type(icon) == Gio.ThemedIcon:
                 themed_name = icon.get_names()[0]
-                theme = gtk.IconTheme.get_default()
+                theme = Gtk.IconTheme.get_default()
                 name = theme.lookup_icon(themed_name, 48, 0).get_filename()
-                
+
             if type(icon) == Gio.FileIcon:
                 name = icon.get_file().get_uri()
         except:
             return None
         else:
-            urllib_decoded = urllib.parse.unquote(name).replace('file://','')
-            #print(urllib_decoded)
+            urllib_decoded = urllib.parse.unquote(name).replace('file://', '')
+            # print(urllib_decoded)
             return urllib_decoded
 
-    def get_desktop_file(self,*args):
-         dbus_call = [ self.bus,self.service,args[-1],
-                       'org.ayatana.bamf.application','DesktopFile',
-                       None
-         ]
-         return self.get_dbus(*dbus_call)
-
-    def get_active_app(self,*args):
-        dbus_call = [self.bus,self.service, self.paths[0],
-                     "org.ayatana.bamf.matcher","ActiveApplication",None]
-        return self.get_dbus(*dbus_call)
-
-    def get_app_xids(self,*args):
+    def get_desktop_file(self, *args):
         dbus_call = [self.bus, self.service, args[-1],
-                     "org.ayatana.bamf.application","Xids",None]
+                     'org.ayatana.bamf.application', 'DesktopFile',
+                     None
+                     ]
         return self.get_dbus(*dbus_call)
 
-    def get_app_name(self,*args):
+    def get_active_app(self, *args):
+        dbus_call = [self.bus, self.service, self.paths[0],
+                     "org.ayatana.bamf.matcher", "ActiveApplication", None]
+        return self.get_dbus(*dbus_call)
+
+    def get_app_xids(self, *args):
         dbus_call = [self.bus, self.service, args[-1],
-                     "org.ayatana.bamf.view","Name",None]
+                     "org.ayatana.bamf.application", "Xids", None]
         return self.get_dbus(*dbus_call)
 
-    def get_running_apps(self,*args):
-        dbus_call = [self.bus, self.service,self.paths[0],
-                     "org.ayatana.bamf.matcher","RunningApplications",None]
+    def get_app_name(self, *args):
+        dbus_call = [self.bus, self.service, args[-1],
+                     "org.ayatana.bamf.view", "Name", None]
         return self.get_dbus(*dbus_call)
 
-# General purpose functions 
+    def get_running_apps(self, *args):
+        dbus_call = [self.bus, self.service, self.paths[0],
+                     "org.ayatana.bamf.matcher", "RunningApplications", None]
+        return self.get_dbus(*dbus_call)
+
+# General purpose functions
 
     def get_dbus(self, bus_type, obj, path, interface, method, arg):
         """ utility: executes dbus method on specific interface"""
@@ -452,9 +473,8 @@ class AyatanaIndicator(object):
         props = props_iface.Get(iface, prop)
         return props
 
-
-    def quit(self,*args):
-        gtk.main_quit()
+    def quit(self, *args):
+        Gtk.main_quit()
 
     def run_cmd(self, cmdlist):
         """ utility: reusable function for running external commands """
@@ -471,22 +491,20 @@ class AyatanaIndicator(object):
     def run(self):
         """ Launches the indicator """
         try:
-            gtk.main()
+            Gtk.main()
         except KeyboardInterrupt:
             pass
 
     def quit(self, *args):
         """ closes indicator """
-        gtk.main_quit()
+        Gtk.main_quit()
 
 
 def main():
     """ defines program entry point """
     indicator = AyatanaIndicator()
+    signal.signal(signal.SIGINT,signal.SIG_DFL)
     indicator.run()
 
 if __name__ == '__main__':
-  try:
     main()
-  except  KeyboardInterrupt:
-    gtk.main_quit()
