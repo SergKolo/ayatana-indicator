@@ -40,6 +40,7 @@ from gi.repository import Gdk
 from collections import OrderedDict
 import urllib.parse
 import subprocess
+import logging
 import signal
 import time
 import dbus
@@ -504,7 +505,11 @@ def main():
     """ defines program entry point """
     indicator = AyatanaIndicator()
     signal.signal(signal.SIGINT,signal.SIG_DFL)
-    indicator.run()
+    logging.basicConfig(level=logging.DEBUG,filename='/tmp/ayatana-indicator.log')
+    try:
+        indicator.run()
+    except:
+        logging.exception("Exception occured:")
 
 if __name__ == '__main__':
     main()
