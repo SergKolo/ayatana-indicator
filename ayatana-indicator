@@ -192,6 +192,8 @@ class AyatanaIndicator(object):
 
         recent_submenu = self.add_submenu(self.app_menu, "recent apps", None)
         for appname,deskt_file,icon in self.seen_apps:
+             if not icon:
+                 icon = 'application-x-executable' 
              item = [recent_submenu,Gtk.ImageMenuItem,
                      icon, appname,
                      self.open_desktop_file,[deskt_file]
