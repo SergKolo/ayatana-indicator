@@ -240,8 +240,11 @@ class AyatanaIndicator(object):
         GLib.timeout_add_seconds(3, self.callback)
 
     def open_desktop_file(self,*args):
-        desk_file = Gio.DesktopAppInfo.new_from_filename(args[-1])
-        return desk_file.launch_uris()
+        try:
+            desk_file = Gio.DesktopAppInfo.new_from_filename(args[-1])
+            return desk_file.launch_uris()
+        except TypeError:
+            return None
 
     def get_dimensions(self, xid):
         dimensions = None
