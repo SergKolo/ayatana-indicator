@@ -145,8 +145,9 @@ class AyatanaIndicator(object):
             if str(app_path) == active:
                 name = '>>>  ' + name
             xids = self.get_app_xids(app_path)
-            num_windows = str(len(xids))
-            name = name + "\n" + num_windows + " windows open"
+            if xids:
+                num_windows = str(len(xids))
+                name = name + "\n" + num_windows + " windows open"
             app_submenu = self.add_submenu(self.app_menu, name, icon)
             for xid in xids:
                 geometry = self.get_dimensions(xid)
